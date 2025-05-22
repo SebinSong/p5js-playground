@@ -13,8 +13,8 @@ class Vehicle {
     this.acceleration = createVector(0, 0)
     this.r = 6
     this.wandertheta = 0.0
-    this.maxSpeed = 6
-    this.maxForce = 0.2
+    this.maxSpeed = 5
+    this.maxForce = 0.15
   }
 
   update () {
@@ -25,19 +25,19 @@ class Vehicle {
 
     this.acceleration.mult(0)
 
-    const { x: px, y: py } = this.position
-    const edgeOffset = 30
-    if (px < -edgeOffset) {
-      this.position.x = width + edgeOffset
-    } else if (px > width + edgeOffset) {
-      this.position.x = -edgeOffset
-    }
+    // const { x: px, y: py } = this.position
+    // const edgeOffset = 30
+    // if (px < -edgeOffset) {
+    //   this.position.x = width + edgeOffset
+    // } else if (px > width + edgeOffset) {
+    //   this.position.x = -edgeOffset
+    // }
 
-    if (py < -edgeOffset) {
-      this.position.y = height + edgeOffset
-    } else if (py > height + edgeOffset) {
-      this.position.y = -edgeOffset
-    }
+    // if (py < -edgeOffset) {
+    //   this.position.y = height + edgeOffset
+    // } else if (py > height + edgeOffset) {
+    //   this.position.y = -edgeOffset
+    // }
   }
 
   applyForce(force) {
@@ -45,6 +45,8 @@ class Vehicle {
   }
 
   wander () {
+    if (this.boundaries(50)) { return }
+
     const wanderR = 25
     const wanderD = 80
     const change = degToRadian(10)
@@ -95,6 +97,32 @@ class Vehicle {
     line(circlePos.x, circlePos.y, target.x, target.y)
   }
 
+  boundaries (offset) {
+    let desired = null
+
+    if (this.position.x < offset) {
+      desired = createVector(this.maxSpeed, this.velocity.y)
+    } else if (this.position.x > width - offset) {
+      desired = createVector(-this.maxSpeed, this.velocity.y)
+    }
+
+    if (this.position.y < offset) {
+      desired = createVector(this.velocity.x, this.maxSpeed)
+    } else if (this.position.y > height - offset) {
+      desired = createVector(this.velocity.x, -this.maxSpeed)
+    }
+
+    if (desired !== null) {
+      desired.normalize()
+      desired.mult(this.maxSpeed)
+      const steer = p5.Vector.sub(desired, this.velocity)
+      steer.limit(this.maxForce)
+      this.applyForce(steer)
+    }
+
+    return Boolean(desired)
+  }
+
   show () {
     const angle = this.velocity.heading()
     push()
@@ -116,7 +144,7 @@ let vehicle
 function setup () {
   createCanvas(640, 320)
   vehicle = new Vehicle(width / 2, height / 2)
-  vehicle.velocity = createVector(0.1, 0.1)
+  vehicle.velocity = createVector(0.05, 0.05)
 }
 
 function draw () {
