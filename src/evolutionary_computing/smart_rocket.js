@@ -36,9 +36,35 @@ class DNA {
   }
 }
 
+class Obstacle {
+  constructor (x, y, w, h) {
+    this.position = createVector(x, y)
+    this.w = w
+    this.h = h
+  }
+
+  contains (spot) {
+    return (
+      spot.x > this.position.x &&
+      spot.x < this.position.x + this.w &&
+      spot.y > this.position.y &&
+      spot.y < this.position.y + this.h
+    )
+  }
+
+  show () {
+    push()
+    fill(150)
+    stroke(0)
+    rect(this.position.x, this.position.y, this.w, this.h)
+    pop()
+  }
+}
+
 class Target {
   constructor (x, y) {
     this.position = createVector(x, y)
+    this.radius = 14
   }
 
   setPosition (x, y) {
@@ -50,8 +76,13 @@ class Target {
     fill(127)
     stroke(0)
     strokeWeight(2)
-    circle(this.position.x, this.position.y, 28)
+    circle(this.position.x, this.position.y, this.radius * 2)
     pop()
+  }
+
+  contains (point) {
+    const dist = p5.Vector.dist(this.position, point)
+    return dist < this.radius
   }
 }
 
@@ -67,6 +98,9 @@ class Rocket {
     this.fitness = 0
     this.normalizedFitness = 0
     this.geneCounter = 0
+
+    this.hitTarget = false
+    this.hitObstacle = false
   }
 
   applyForce (force) {
@@ -82,13 +116,42 @@ class Rocket {
   calculateFitness (target) {
     const distance = p5.Vector.dist(this.position, target.position)
     this.fitness = 1 / (distance * distance)
+
+    if (this.hitObstacle) {
+      this.fitness *= 0.01
+    } else if (this.hitTarget) {
+      this.fitness *= 2
+    }
   }
 
-  run () {
+  checkObstacle (obstacle) {
+    if (obstacle.contains(this.position)) {
+      this.hitObstacle = true
+
+      for (let i = this.geneCounter; i < LIFESPAN; i++) {
+        this.dna.genes[i] = createVector(0, 0)
+      }
+    }
+  }
+
+  checkReachedTarget (target) {
+    if (target.contains(this.position)) {
+      console.log('!@# true !!')
+      this.hitTarget = true
+    }
+  }
+
+  run ({ obstacle = null, target = null }) {
     if (this.geneCounter < LIFESPAN) {
-      this.applyForce(this.dna.genes[this.geneCounter])
-      this.geneCounter++
-      this.update()
+      if (!this.hitObstacle && !this.hitTarget) {
+        this.applyForce(this.dna.genes[this.geneCounter])
+        this.geneCounter++
+        this.update()
+
+        obstacle && this.checkObstacle(obstacle)
+        target && this.checkReachedTarget(target)
+      }
+
       this.show()
     }
   }
@@ -142,7 +205,6 @@ class Population {
     })
 
     const allNormalizedFitness = this.population.reduce((accu, rocket) => accu + rocket.normalizedFitness, 0)
-    console.log('!@# allNormalizedFitness: ', allNormalizedFitness)
   }
 
   weightedSelection () {
@@ -150,7 +212,7 @@ class Population {
     let randomVal = random(1)
 
     while (randomVal > this.population[index].normalizedFitness) {
-      randomVal -=  this.population[index].normalizedFitness
+      randomVal -= this.population[index].normalizedFitness
       index++
     }
 
@@ -173,9 +235,9 @@ class Population {
     this.generations++
   }
 
-  run () {
+  run ({ obstacle = null, target = null } = {}) {
     if (this.lifeCounter < LIFESPAN) {
-      this.population.forEach(rocket => rocket.run())
+      this.population.forEach(rocket => rocket.run({ obstacle, target }))
       this.lifeCounter++
     } else {
       this.fitness()
@@ -197,22 +259,24 @@ class Population {
   }
 }
 
-let target
+let target, obstacle
 let populationManager
 
 function setup () {
   createCanvas(640, 320)
 
   target = new Target(width / 2, 25)
+  obstacle = new Obstacle(width / 2 - 50, height - 100, 100, 20)
   populationManager = new Population(MUTATION_RATE, POPULATION_SIZE, target)
 }
 
 function draw () {
   background(255)
 
-  target.show()
-  populationManager.run()
+  populationManager.run({ obstacle, target })
   populationManager.showInfo()
+  target.show()
+  obstacle.show()
 }
 
 function mousePressed () {
